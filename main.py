@@ -33,7 +33,7 @@ class App:
         self.statusMessage = tk.Label(self.frame1, text='', font=("Arial", 9))
         self.statusMessage.pack(padx=10, pady=10)
 
-        self.labelFrame2 = tk.LabelFrame(self.frame1, text="Suggestion")
+        self.labelFrame2 = tk.LabelFrame(self.frame1, text="Boxes To Use")
         self.labelFrame2.pack(padx=20, pady=20)
 
         self.resultsBox = tk.Text(self.labelFrame2, font=("Arial", 9), width=50)
@@ -56,8 +56,9 @@ class App:
         self.statusMessage.config(text="")
 
     def submit(self):
-        self.statusMessage.config(text="Processing...")
         self.clearMessages()
+        self.statusMessage.config(text="Processing...")
+        self.root.update()
 
         inputFilename = self.inputField.get()
 
@@ -74,6 +75,8 @@ class App:
                 self.resultsBox.config(state=tk.DISABLED)
 
             self.inputField.delete(0, "end")
+
+        self.statusMessage.config(text="")
 
     def showStatusMessage(self, title, message):
         messagebox.showinfo(title=title, message=message)

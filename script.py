@@ -180,48 +180,127 @@ def combineDetailsForEachItem(inventoryMaster, items):
     
     return itemLines, itemsWithNoInfo
 
-def distributeToBoxes(boxes, itemLines):
-    activeBoxes = [[boxes[i]['volume'], 0] for i in range(len(boxes))]
-    activeBoxesContent = [[] for i in range(len(boxes))]
+def splitCasesAndBoxesForEachItem(itemLines):
+    newItemLines = []
 
-    boxIndex = 0
     for item in itemLines:
-        while (activeBoxes[boxIndex][0] < item.volume or (activeBoxes[boxIndex][1] + item.weight) > MAX_WEIGHT_PER_BOX) and boxIndex < len(activeBoxes):
-            boxIndex += 1
-        if activeBoxes[boxIndex][0] >= item.volume and (activeBoxes[boxIndex][1] + item.weight) <= MAX_WEIGHT_PER_BOX:
-            activeBoxes[boxIndex][0] -= item.volume
-            activeBoxes[boxIndex][1] += item.weight
-            activeBoxesContent[boxIndex].append(item)
-        boxIndex = 0
+        if item.uomCode == 'CASE' and item.qty > 1:
+            itemQty = item.qty
+            item.qty = 1
+            newItemLines.append(item)
+            for _ in range(itemQty - 1):
+                newItem = ItemLine()
+                newItem.sku = item.sku
+                newItem.itemDescription = item.itemDescription
+                newItem.uomCode = item.uomCode
+                newItem.qty = 1
+                newItem.pricePerPiece = item.pricePerPiece
+                newItem.totalLC = item.totalLC
+                newItem.unitPrice = item.unitPrice
+                newItem.available = item.available
+                newItem.length = item.length
+                newItem.width = item.width
+                newItem.height = item.height
+                newItem.volume = item.volume
+                newItem.weight = item.weight
+                newItemLines.append(item)
+        else:
+            newItemLines.append(item)
 
-    return activeBoxes, activeBoxesContent
+    return newItemLines
+
+def distributeToBoxes(boxes, itemLines):
+    # Sort items from highest volume to lowest volume
+    itemLines.sort(key=lambda i:i.volume, reverse=True)
+    # TODO: Sort boxes from lowest volume to highest volume
+
+    activeBoxes = []
+    activeBoxesContent = []
+    itemsDoNotFit = []
+
+    for item in itemLines:
+        foundABox = False
+        itemTotalVolume = item.volume * item.qty
+        itemTotalWeight = item.weight * item.qty
+        # look at previous boxes
+        if activeBoxes:
+            for i in range(len(activeBoxes)):
+                # if item fits in a previous box
+                if activeBoxes[i][0] >= itemTotalVolume and activeBoxes[i][1] + itemTotalWeight <= MAX_WEIGHT_PER_BOX:
+                    activeBoxes[i][0] -= itemTotalVolume
+                    activeBoxes[i][1] += itemTotalWeight
+                    activeBoxesContent[i].append(item)
+                    # activeBoxesContent[i].append('{}-{}'.format(item.sku, item.uomCode)) # for debugging
+                    foundABox = True
+                    break
+                # check if we can combine item(s) from previous box with current item in a bigger box
+                nextBoxIndex = activeBoxes[i][3] + 1
+                if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
+                    nextBox = boxes[nextBoxIndex]
+                    currentBoxVolume = activeBoxes[i][0]
+                    currentBoxWeight = activeBoxes[i][1]
+                    if currentBoxVolume + itemTotalVolume <= nextBox['volume'] and currentBoxWeight + itemTotalWeight <= MAX_WEIGHT_PER_BOX:
+                        activeBoxes.append([nextBox['volume'] - (currentBoxVolume + itemTotalVolume), currentBoxWeight + itemTotalWeight, nextBox['name'], nextBoxIndex])
+                        activeBoxesContent.append([item] + activeBoxesContent[i])
+                        # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
+                        #                              [i]) # for debugging
+                        activeBoxes[i][0] = -1
+                        activeBoxesContent[i] = []
+                        foundABox = True
+                        break
+        # find a new box
+        if not foundABox:
+            for i in range(len(boxes)):
+                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight <= MAX_WEIGHT_PER_BOX:
+                    activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight, boxes[i]['name'], i])
+                    activeBoxesContent.append([item])
+                    # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)]) # for debugging
+                    foundABox = True
+                    break
+        # item could not find a box
+        if not foundABox:
+            itemsDoNotFit.append(item.sku)
+
+    return activeBoxes, activeBoxesContent, itemsDoNotFit
 
 def compileResults(boxesMaster, boxes, boxesContents):
-    results = {}
+    results = []
+    boxesMap = {}
+
+    for box in boxesMaster:
+        boxesMap[box['name']] = {
+            'length': box['length'],
+            'width': box['width'],
+            'height': box['height'],
+            'volume': box['volume']
+        }
 
     for i in range(len(boxes)):
+        boxName = boxes[i][2]
         if boxesContents[i]:
-            results[boxesMaster[i]['name']] = {
-                'volumeFilled': round(boxesMaster[i]['volume'] - boxes[i][0], 3),
+            results.append({
+                'name': boxName,
+                'boxVolume': boxesMap[boxName]['volume'],
+                'volumeFilled': round(boxesMap[boxName]['volume'] - boxes[i][0], 3),
                 'weight': round(boxes[i][1], 3),
                 'contents': boxesContents[i],
-                'length': boxesMaster[i]['length'],
-                'width': boxesMaster[i]['width'],
-                'height': boxesMaster[i]['height']
-            }
+                'length': boxesMap[boxName]['length'],
+                'width': boxesMap[boxName]['width'],
+                'height': boxesMap[boxName]['height']
+            })
 
     return results
 
 def displayResultsAsString(results):
     texts = []
     count = 1
-    for boxName, info in results.items():
+    for box in results:
         contents = []
-        for item in info['contents']:
+        for item in box['contents']:
             contents.append('{}-{:<8}x{}'.format(item.sku, item.uomCode, item.qty))
 
-        texts.append('{}. Box - {} ({}"x{}"x{}")'.format(count, boxName, info['length'], info['width'], info['height']))
-        texts.append('Weight: {} Lb'.format(info['weight']))
+        texts.append('{}. Box - {} ({}" x {}" x {}")'.format(count, box['name'], box['length'], box['width'], box['height']))
+        texts.append('Weight: {} Lb'.format(box['weight']))
         texts.append('Contents:\n{}'.format('\n'.join(contents)))
         texts.append(' ')
         count += 1
@@ -232,15 +311,21 @@ def distribute(filepath):
     success = True
 
     inventoryMaster, invMsg = getInventoryMasterData('./warehouse_master.xlsx')
-    items, itemsMsg = getSalesQuotationItemsFromInputfile("./sq_2.xlsx")
+    items, itemsMsg = getSalesQuotationItemsFromInputfile("./sq_3.xlsx")
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
-
-    boxes, boxesContents = distributeToBoxes(dummyBoxes, itemLines)
-
+    print("Original")
+    for item in itemLines:
+        print(item)
+    splittedItemLines = splitCasesAndBoxesForEachItem(itemLines)
+    print("Splitted")
+    for item in splittedItemLines:
+        print(item)
+    boxes, boxesContents, itemsDoNotFit = distributeToBoxes(dummyBoxes, splittedItemLines)
+    print('Items Do Not Fit: ', itemsDoNotFit)
     results = compileResults(dummyBoxes, boxes, boxesContents)
 
     return {
-        'success': True,
+        'success': success,
         'results': displayResultsAsString(results)
     }
 
@@ -268,3 +353,6 @@ def writeLog(timestamp, status):
             file.write('USR;{} | IN;{} | SUCCESS;{} | ERR;{} | WARNING;{} | WARN;{} | OOS;{} | OUT;{} | VER;{} | TS;{}\n'.format(user, status["inputFilename"], status["success"], status["errorMessage"], status["warning"], status["warningMessage"], status["outOfStockSKUs"], status["outputFilename"], APP_VERSION, timestamp))
     except:
         print('*** Error: Failed to write to logs. ***')
+
+
+distribute('')
