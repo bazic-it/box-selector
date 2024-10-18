@@ -357,6 +357,3 @@ def writeLog(timestamp, status):
             file.write('USR;{} | IN;{} | SUCCESS;{} | ERR;{} | WARNING;{} | WARN;{} | OOS;{} | OUT;{} | VER;{} | TS;{}\n'.format(user, status["inputFilename"], status["success"], status["errorMessage"], status["warning"], status["warningMessage"], status["outOfStockSKUs"], status["outputFilename"], APP_VERSION, timestamp))
     except:
         print('*** Error: Failed to write to logs. ***')
-
-
-getBoxesMasterData('./boxes_master.csv')
