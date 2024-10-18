@@ -6,31 +6,6 @@ from functools import cmp_to_key
 from utils import *
 from config import *
 
-
-dummyBoxes = [
-    {
-        'name': 'A',
-        'length': 12.0,
-        'width': 11.5,
-        'height': 9.5,
-        'volume': 0.759
-    },
-    {
-        'name': 'B',
-        'length': 20.0,
-        'width': 15.5,
-        'height': 12.5,
-        'volume': 2.242
-    },
-    {
-        'name': 'C',
-        'length': 25.5,
-        'width': 18.2,
-        'height': 16.5,
-        'volume': 4.431
-    }
-]
-
 class ItemLine:
     def __init__(self):
         self.sku = None
@@ -57,6 +32,9 @@ def sortOrders(a, b):
         return -1
     else:
         return 1
+
+def sortBoxes(boxes):
+    return sorted(boxes, key=lambda b:b['volume'])
 
 def getInventoryMasterData(inputFilepath):
     age = getDaysDifferent(getCurrentime(), getFileModifiedDate(inputFilepath))
@@ -122,6 +100,34 @@ def getSalesQuotationItemsFromInputfile(filepath):
         return {}, message
     
     return items, message
+
+def getBoxesMasterData(inputFilepath):
+    boxes = []
+    message = None
+
+    try:
+        age = getDaysDifferent(getCurrentime(), getFileModifiedDate(inputFilepath))
+        message = 'Boxes master file was updated {} days ago.'.format(age)
+        row = 0
+        with open (inputFilepath, mode='r') as file:
+            content = csv.reader(file)
+            for line in content:
+                if row == 0:
+                    row += 1
+                    continue
+                boxes.append({
+                        'name': line[0],
+                        'length': float(line[1]),
+                        'width': float(line[2]),
+                        'height': float(line[3]),
+                        'volume': float(line[4])
+                    })
+                row += 1
+    except:
+        print('*** Error: Failed to read input file for UOM Master. Please make sure filename is valid. ***')
+        return {}, message
+
+    return boxes, message
 
 def convertStringToFloat(value):
     if type(value) == str:
@@ -212,7 +218,8 @@ def splitCasesAndBoxesForEachItem(itemLines):
 def distributeToBoxes(boxes, itemLines):
     # Sort items from highest volume to lowest volume
     itemLines.sort(key=lambda i:i.volume, reverse=True)
-    # TODO: Sort boxes from lowest volume to highest volume
+    # Sort boxes from lowest volume to highest volume
+    boxes = sortBoxes(boxes)
 
     activeBoxes = []
     activeBoxesContent = []
@@ -311,18 +318,15 @@ def distribute(filepath):
     success = True
 
     inventoryMaster, invMsg = getInventoryMasterData('./warehouse_master.xlsx')
+    boxesMaster, boxMsg = getBoxesMasterData('./boxes_master.csv')
     items, itemsMsg = getSalesQuotationItemsFromInputfile("./sq_3.xlsx")
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
-    print("Original")
-    for item in itemLines:
-        print(item)
+
     splittedItemLines = splitCasesAndBoxesForEachItem(itemLines)
-    print("Splitted")
-    for item in splittedItemLines:
-        print(item)
-    boxes, boxesContents, itemsDoNotFit = distributeToBoxes(dummyBoxes, splittedItemLines)
-    print('Items Do Not Fit: ', itemsDoNotFit)
-    results = compileResults(dummyBoxes, boxes, boxesContents)
+
+    boxes, boxesContents, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
+
+    results = compileResults(boxesMaster, boxes, boxesContents)
 
     return {
         'success': success,
@@ -355,4 +359,4 @@ def writeLog(timestamp, status):
         print('*** Error: Failed to write to logs. ***')
 
 
-distribute('')
+getBoxesMasterData('./boxes_master.csv')
