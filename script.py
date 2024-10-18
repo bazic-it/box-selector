@@ -82,7 +82,6 @@ def getSalesQuotationItemsFromInputfile(filepath):
         sheet = workbook.active
         for r in range(1, sheet.max_row+1):
             item = {}
-            itemNumber = None
             for c in range(1, sheet.max_column+1):
                 data = sheet.cell(row=r, column=c).value
                 if r == 1:
@@ -115,12 +114,16 @@ def getBoxesMasterData(inputFilepath):
                 if row == 0:
                     row += 1
                     continue
+                length = float(line[1])
+                width = float(line[2])
+                height = float(line[3])
+                volume = cubicInchesToCubicFeet(length, width, height)
                 boxes.append({
                         'name': line[0],
-                        'length': float(line[1]),
-                        'width': float(line[2]),
-                        'height': float(line[3]),
-                        'volume': float(line[4])
+                        'length': length,
+                        'width': width,
+                        'height': height,
+                        'volume': volume
                     })
                 row += 1
     except:
