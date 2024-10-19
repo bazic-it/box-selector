@@ -117,13 +117,15 @@ def getBoxesMasterData(inputFilepath):
                 length = float(line[1])
                 width = float(line[2])
                 height = float(line[3])
+                weight = float(line[4])
                 volume = cubicInchesToCubicFeet(length, width, height)
                 boxes.append({
                         'name': line[0],
                         'length': length,
                         'width': width,
                         'height': height,
-                        'volume': volume
+                        'volume': volume,
+                        'weight': weight
                     })
                 row += 1
     except:
@@ -244,13 +246,15 @@ def distributeToBoxes(boxes, itemLines):
                     foundABox = True
                     break
                 # check if we can combine item(s) from previous box with current item in a bigger box
-                nextBoxIndex = activeBoxes[i][3] + 1
+                nextBoxIndex = activeBoxes[i][4] + 1
                 if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
                     nextBox = boxes[nextBoxIndex]
-                    currentBoxVolume = activeBoxes[i][0]
-                    currentBoxWeight = activeBoxes[i][1]
-                    if currentBoxVolume + itemTotalVolume <= nextBox['volume'] and currentBoxWeight + itemTotalWeight <= MAX_WEIGHT_PER_BOX:
-                        activeBoxes.append([nextBox['volume'] - (currentBoxVolume + itemTotalVolume), currentBoxWeight + itemTotalWeight, nextBox['name'], nextBoxIndex])
+                    currentBoxTotalVolume = activeBoxes[i][0]
+                    currentBoxTotalWeight = activeBoxes[i][1]
+                    currentBoxWeight = activeBoxes[i][2]
+                    newBoxWeight = nextBox['weight'] - currentBoxWeight
+                    if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight <= MAX_WEIGHT_PER_BOX:
+                        activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex])
                         activeBoxesContent.append([item] + activeBoxesContent[i])
                         # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
                         #                              [i]) # for debugging
@@ -261,8 +265,8 @@ def distributeToBoxes(boxes, itemLines):
         # find a new box
         if not foundABox:
             for i in range(len(boxes)):
-                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight <= MAX_WEIGHT_PER_BOX:
-                    activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight, boxes[i]['name'], i])
+                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] <= MAX_WEIGHT_PER_BOX:
+                    activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight + boxes[i]['weight'], boxes[i]['weight'], boxes[i]['name'], i])
                     activeBoxesContent.append([item])
                     # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)]) # for debugging
                     foundABox = True
@@ -286,7 +290,7 @@ def compileResults(boxesMaster, boxes, boxesContents):
         }
 
     for i in range(len(boxes)):
-        boxName = boxes[i][2]
+        boxName = boxes[i][3]
         if boxesContents[i]:
             results.append({
                 'name': boxName,
@@ -319,6 +323,8 @@ def displayResultsAsString(results):
 
 def distribute(filepath):
     success = True
+
+    # salesQuotationFilepath = validateInputFilename(filepath)
 
     inventoryMaster, invMsg = getInventoryMasterData('./warehouse_master.xlsx')
     boxesMaster, boxMsg = getBoxesMasterData('./boxes_master.csv')
