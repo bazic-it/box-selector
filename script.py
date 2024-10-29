@@ -2,6 +2,7 @@ import os
 import csv
 import pandas as pd
 import openpyxl
+import math
 from functools import cmp_to_key
 from utils import *
 from config import *
@@ -114,9 +115,9 @@ def getBoxesMasterData(inputFilepath):
                 if row == 0:
                     row += 1
                     continue
-                length = float(line[1])
-                width = float(line[2])
-                height = float(line[3])
+                length = float(line[1]) - BOX_DIMENSION_PADDING
+                width = float(line[2]) - BOX_DIMENSION_PADDING
+                height = float(line[3]) - BOX_DIMENSION_PADDING
                 weight = float(line[4])
                 volume = cubicInchesToCubicFeet(length, width, height)
                 boxes.append({
@@ -246,6 +247,9 @@ def distributeToBoxes(boxes, itemLines):
         # look at previous boxes
         if activeBoxes:
             for i in range(len(activeBoxes)):
+                activeBoxTotalVolume = activeBoxes[i][0]
+                activeBoxTotalWeight = activeBoxes[i][1]
+                activeBoxWeight = activeBoxes[i][2]
                 activeBoxesLength = activeBoxes[i][5]
                 activeBoxesWidth = activeBoxes[i][6]
                 activeBoxesHeight = activeBoxes[i][7]
@@ -261,12 +265,12 @@ def distributeToBoxes(boxes, itemLines):
                 nextBoxIndex = activeBoxes[i][4] + 1
                 if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
                     nextBox = boxes[nextBoxIndex]
-                    currentBoxTotalVolume = activeBoxes[i][0]
-                    currentBoxTotalWeight = activeBoxes[i][1]
-                    currentBoxWeight = activeBoxes[i][2]
+                    currentBoxTotalVolume = activeBoxTotalVolume
+                    currentBoxTotalWeight = activeBoxTotalWeight
+                    currentBoxWeight = activeBoxWeight
                     newBoxWeight = nextBox['weight'] - currentBoxWeight
                     if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight <= MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
-                        activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex])
+                        activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex, nextBox['length'], nextBox['width'], nextBox['height']])
                         activeBoxesContent.append([item] + activeBoxesContent[i])
                         # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
                         #                              [i]) # for debugging
@@ -325,8 +329,8 @@ def displayResultsAsString(results):
         for item in box['contents']:
             contents.append('{}-{:<8}x{}'.format(item.sku, item.uomCode, item.qty))
 
-        texts.append('{}. Box - {} ({}" x {}" x {}")'.format(count, box['name'], box['length'], box['width'], box['height']))
-        texts.append('Weight: {} Lb'.format(box['weight']))
+        texts.append('{}. Box - {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
+        texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
         texts.append('Contents:\n{}'.format('\n'.join(contents)))
         texts.append(' ')
         count += 1
@@ -336,11 +340,11 @@ def displayResultsAsString(results):
 def distribute(filepath):
     success = True
 
-    # salesQuotationFilepath = validateInputFilename(filepath)
+    salesQuotationFilepath = validateInputFilename(filepath)
 
     inventoryMaster, invMsg = getInventoryMasterData('./warehouse_master.xlsx')
     boxesMaster, boxMsg = getBoxesMasterData('./boxes_master.csv')
-    items, itemsMsg = getSalesQuotationItemsFromInputfile("./sq_3.xlsx")
+    items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
 
     splittedItemLines = splitCasesAndBoxesForEachItem(itemLines)
@@ -370,11 +374,11 @@ def getUOMMasterFilepath():
 def getInventoryMasterFilepath():
     return os.path.join(ASSETS_BASE_DIR, INVENTORY_MASTER_FILENAME)
 
-def writeLog(timestamp, status):
-    path = os.path.join(ASSETS_BASE_DIR, LOGS_FILENAME)
-    user = os.getenv('COMPUTERNAME')
-    try:
-        with open(path, 'a') as file:
-            file.write('USR;{} | IN;{} | SUCCESS;{} | ERR;{} | WARNING;{} | WARN;{} | OOS;{} | OUT;{} | VER;{} | TS;{}\n'.format(user, status["inputFilename"], status["success"], status["errorMessage"], status["warning"], status["warningMessage"], status["outOfStockSKUs"], status["outputFilename"], APP_VERSION, timestamp))
-    except:
-        print('*** Error: Failed to write to logs. ***')
+# def writeLog(timestamp, status):
+#     path = os.path.join(ASSETS_BASE_DIR, LOGS_FILENAME)
+#     user = os.getenv('COMPUTERNAME')
+#     try:
+#         with open(path, 'a') as file:
+#             file.write('USR;{} | IN;{} | SUCCESS;{} | ERR;{} | WARNING;{} | WARN;{} | OOS;{} | OUT;{} | VER;{} | TS;{}\n'.format(user, status["inputFilename"], status["success"], status["errorMessage"], status["warning"], status["warningMessage"], status["outOfStockSKUs"], status["outputFilename"], APP_VERSION, timestamp))
+#     except:
+#         print('*** Error: Failed to write to logs. ***')
