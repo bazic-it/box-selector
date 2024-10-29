@@ -38,15 +38,16 @@ def sortBoxes(boxes):
     return sorted(boxes, key=lambda b:b['volume'])
 
 def getInventoryMasterData(inputFilepath):
-    age = getDaysDifferent(getCurrentime(), getFileModifiedDate(inputFilepath))
-    message = 'Inventory master file was updated {} days ago.'.format(age)
-
+    message = None
     targetColumns = ['Item No.', 'Available Qty', 'Case Length', 'Case Width', 'Case Height', 'Case Volume', 'Case Weight', 'Box Length', 'Box Width', 'Box Height', 'Box Volume', 'Box Weight', 'EA Length', 'EA Width', 'EA Height', 'EA Volume', 'EA Weight']
     keyColumn = 'Item No.'
     headerMap = {}
     mapped = {}
 
     try:
+        age = getDaysDifferent(getCurrentime(), getFileModifiedDate(inputFilepath))
+        message = 'Inventory master file was updated {} days ago.'.format(age)
+
         workbook = openpyxl.load_workbook(inputFilepath)
         sheet = workbook.active
         for r in range(1, sheet.max_row+1):
@@ -71,14 +72,15 @@ def getInventoryMasterData(inputFilepath):
     return mapped, message
 
 def getSalesQuotationItemsFromInputfile(filepath):
-    age = getDaysDifferent(getCurrentime(), getFileModifiedDate(filepath))
-    message = 'Inventory master file was updated {} days ago.'.format(age)
-
+    message = None
     targetColumns = ['Item No.', 'Item Description', 'UoM Code', 'Quantity', 'Price Per Piece', 'Total (LC)', 'Unit Price', 'Available Qty']
     headerMap = {}
     items = []
     
     try:
+        age = getDaysDifferent(getCurrentime(), getFileModifiedDate(filepath))
+        message = 'Inventory master file was updated {} days ago.'.format(age)
+
         workbook = openpyxl.load_workbook(filepath)
         sheet = workbook.active
         for r in range(1, sheet.max_row+1):
@@ -342,7 +344,7 @@ def distribute(filepath):
 
     salesQuotationFilepath = validateInputFilename(filepath)
 
-    inventoryMaster, invMsg = getInventoryMasterData('./warehouse_master.xlsx')
+    inventoryMaster, invMsg = getInventoryMasterData('./' + INVENTORY_MASTER_FILENAME)
     boxesMaster, boxMsg = getBoxesMasterData('./boxes_master.csv')
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
@@ -367,9 +369,6 @@ def validateInputFilename(filename):
         cleaned = cleaned + '.xlsx'
 
     return USER_DOWNLOADS + cleaned
-
-def getUOMMasterFilepath():
-    return os.path.join(ASSETS_BASE_DIR, UOM_MASTER_FILENAME)
 
 def getInventoryMasterFilepath():
     return os.path.join(ASSETS_BASE_DIR, INVENTORY_MASTER_FILENAME)
