@@ -2,7 +2,7 @@ from pathlib import Path
 
 APP_VERSION = '1.0.2'
 
-ASSETS_BASE_DIR = 'S:/ECOM-CC-WHS/master_files/box_selector'
+ASSETS_BASE_DIR = 'S:/!Warehouse/Box Selector Master'
 BOX_MASTER_FILENAME = 'boxes_master.csv'
 INVENTORY_MASTER_FILENAME = 'Item List with PICTURE (For Excel) - All Items.xlsx'
 # LOGS_FILENAME = 'logs.txt'
