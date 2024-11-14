@@ -265,6 +265,7 @@ def distributeToBoxes(boxes, itemLines):
                     break
                 # check if we can combine item(s) from previous box with current item in a bigger box
                 nextBoxIndex = activeBoxes[i][4] + 1
+                # while (nextBoxIndex < len(boxes) and volume_manipulation)
                 if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
                     nextBox = boxes[nextBoxIndex]
                     currentBoxTotalVolume = activeBoxTotalVolume
@@ -344,8 +345,8 @@ def distribute(filepath):
 
     salesQuotationFilepath = validateInputFilename(filepath)
 
-    inventoryMaster, invMsg = getInventoryMasterData('./' + INVENTORY_MASTER_FILENAME)
-    boxesMaster, boxMsg = getBoxesMasterData('./boxes_master.csv')
+    inventoryMaster, invMsg = getInventoryMasterData(getInventoryMasterFilepath())
+    boxesMaster, boxMsg = getBoxesMasterData(getBoxMasterFilepath())
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
 
@@ -369,9 +370,6 @@ def validateInputFilename(filename):
         cleaned = cleaned + '.xlsx'
 
     return USER_DOWNLOADS + cleaned
-
-def getInventoryMasterFilepath():
-    return os.path.join(ASSETS_BASE_DIR, INVENTORY_MASTER_FILENAME)
 
 # def writeLog(timestamp, status):
 #     path = os.path.join(ASSETS_BASE_DIR, LOGS_FILENAME)

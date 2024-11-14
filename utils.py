@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from config import *
 
 def getTimestamp():
     now = datetime.now()
@@ -16,3 +17,9 @@ def getDaysDifferent(currentTime, timestamp):
 
 def cubicInchesToCubicFeet(l, w, h):
     return round((l * w * h) / 1728, 3)
+
+def getBoxMasterFilepath():
+    return os.path.join(ASSETS_BASE_DIR, BOX_MASTER_FILENAME)
+
+def getInventoryMasterFilepath():
+    return os.path.join(ASSETS_BASE_DIR, INVENTORY_MASTER_FILENAME)
