@@ -10,7 +10,7 @@ INSTRUCTION = """
 class App:
     def __init__(self):
         self.root = tk.Tk()
-        # self.root.iconbitmap("./assets/icon/icon.ico")
+        self.root.iconbitmap("./assets/icon/icon.ico")
         self.root.title("Box Picker - {}".format(APP_VERSION))
         self.root.geometry("350x550")
 

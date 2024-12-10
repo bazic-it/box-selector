@@ -68,7 +68,7 @@ def getInventoryMasterData(inputFilepath):
     except Exception as e:
         print('*** Error: Failed to read input file for Inventory Master: {} ***'.format(e))
         return {}, message
-  
+    
     return mapped, message
 
 def getSalesQuotationItemsFromInputfile(filepath):
@@ -241,8 +241,14 @@ def distributeToBoxes(boxes, itemLines):
     activeBoxes = []
     activeBoxesContent = []
     itemsDoNotFit = []
+    itemsShipAsIs = []
 
     for item in itemLines:
+        # decide if want to ship Case as is (without outer box)
+        if item.uomCode == 'CASE' and item.weight >= SHIP_CASE_AS_IS_WEIGHT_THRESHOLD:
+            itemsShipAsIs.append(item)
+            continue
+
         foundABox = False
         itemTotalVolume = item.volume * item.qty
         itemTotalWeight = item.weight * item.qty
@@ -294,9 +300,9 @@ def distributeToBoxes(boxes, itemLines):
         if not foundABox:
             itemsDoNotFit.append(item.sku)
 
-    return activeBoxes, activeBoxesContent, itemsDoNotFit
+    return activeBoxes, activeBoxesContent, itemsShipAsIs, itemsDoNotFit
 
-def compileResults(boxesMaster, boxes, boxesContents):
+def compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs):
     results = []
     boxesMap = {}
 
@@ -307,6 +313,19 @@ def compileResults(boxesMaster, boxes, boxesContents):
             'height': box['height'],
             'volume': box['volume']
         }
+
+    for item in itemsShipAsIs:
+        results.append({
+            'name': item.sku + '-' + item.uomCode,
+            'boxVolume': item.volume,
+            'volumeFilled': item.volume,
+            'weight': item.weight,
+            'contents': '-',
+            'length': item.length,
+            'width': item.width,
+            'height': item.height,
+            'type': 'as_is'
+        })
 
     for i in range(len(boxes)):
         boxName = boxes[i][3]
@@ -319,7 +338,8 @@ def compileResults(boxesMaster, boxes, boxesContents):
                 'contents': boxesContents[i],
                 'length': boxesMap[boxName]['length'],
                 'width': boxesMap[boxName]['width'],
-                'height': boxesMap[boxName]['height']
+                'height': boxesMap[boxName]['height'],
+                'type': 'outer_box'
             })
 
     return results
@@ -327,15 +347,25 @@ def compileResults(boxesMaster, boxes, boxesContents):
 def displayResultsAsString(results):
     texts = []
     count = 1
-    for box in results:
-        contents = []
-        for item in box['contents']:
-            contents.append('{}-{:<8}x{}'.format(item.sku, item.uomCode, item.qty))
 
-        texts.append('{}. Box - {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
-        texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
-        texts.append('Contents:\n{}'.format('\n'.join(contents)))
-        texts.append(' ')
+    for result in results:
+        if result['type'] == 'outer_box':
+            box = result
+            contents = []
+            for item in box['contents']:
+                contents.append('{}-{:<8}x{}'.format(item.sku, item.uomCode, item.qty))
+
+            texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
+            texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
+            texts.append('Contents:\n{}'.format('\n'.join(contents)))
+            texts.append(' ')
+        elif result['type'] == 'as_is':
+            texts.append('{}. As Is: {} ({}" x {}" x {}")'.format(count, result['name'], result['length'], result['width'], result['height']))
+            texts.append('Weight: {} Lb'.format(math.ceil(result['weight'])))
+            texts.append(' ')
+        else:
+            pass
+
         count += 1
 
     return texts
@@ -352,9 +382,13 @@ def distribute(filepath):
 
     splittedItemLines = splitCasesAndBoxesForEachItem(itemLines)
 
-    boxes, boxesContents, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
+    print("Items List:")
+    for item in splittedItemLines:
+        print(item)
 
-    results = compileResults(boxesMaster, boxes, boxesContents)
+    boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
+
+    results = compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs)
 
     return {
         'success': success,
