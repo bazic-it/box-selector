@@ -194,11 +194,12 @@ def combineDetailsForEachItem(inventoryMaster, items):
     
     return itemLines, itemsWithNoInfo
 
-def splitCasesAndBoxesForEachItem(itemLines):
+def splitItem(itemLines):
     newItemLines = []
 
     for item in itemLines:
-        if item.uomCode == 'CASE' and item.qty > 1:
+        # if item.uomCode == 'CASE' and item.qty > 1:
+        if item.qty > 1:
             itemQty = item.qty
             item.qty = 1
             newItemLines.append(item)
@@ -330,12 +331,30 @@ def compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs):
     for i in range(len(boxes)):
         boxName = boxes[i][3]
         if boxesContents[i]:
+            # consolidate content based on qty
+            consolidatedContents = {}
+            for content in boxesContents[i]:
+                key = content.sku + '-' + content.uomCode
+                if key in consolidatedContents:
+                    consolidatedContents[key]['qty'] += 1
+                else:
+                    consolidatedContents[key] = {
+                        'sku': content.sku,
+                        'uomCode': content.uomCode,
+                        'qty': 1,
+                        'length': content.length,
+                        'width': content.width,
+                        'height': content.height,
+                        'volume': content.volume,
+                        'weight': content.weight
+                    }
+
             results.append({
                 'name': boxName,
                 'boxVolume': boxesMap[boxName]['volume'],
                 'volumeFilled': round(boxesMap[boxName]['volume'] - boxes[i][0], 3),
                 'weight': round(boxes[i][1], 3),
-                'contents': boxesContents[i],
+                'contents': consolidatedContents,
                 'length': boxesMap[boxName]['length'],
                 'width': boxesMap[boxName]['width'],
                 'height': boxesMap[boxName]['height'],
@@ -352,8 +371,8 @@ def displayResultsAsString(results):
         if result['type'] == 'outer_box':
             box = result
             contents = []
-            for item in box['contents']:
-                contents.append('{}-{:<8}x{}'.format(item.sku, item.uomCode, item.qty))
+            for contentKey, contentValues in box['contents'].items():
+                contents.append('{}-{:<8}x{}'.format(contentValues['sku'], contentValues['uomCode'], contentValues['qty']))
 
             texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
             texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
@@ -380,11 +399,11 @@ def distribute(filepath):
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
 
-    splittedItemLines = splitCasesAndBoxesForEachItem(itemLines)
+    splittedItemLines = splitItem(itemLines)
 
-    print("Items List:")
-    for item in splittedItemLines:
-        print(item)
+    # print("Items List:")
+    # for item in splittedItemLines:
+    #     print(item)
 
     boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
 
