@@ -1,6 +1,6 @@
 from pathlib import Path
 
-APP_VERSION = '1.0.4'
+APP_VERSION = '1.0.5'
 
 ASSETS_BASE_DIR = 'S:/!Warehouse/Box Selector Master'
 # ASSETS_BASE_DIR = './'
