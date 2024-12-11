@@ -263,7 +263,7 @@ def distributeToBoxes(boxes, itemLines):
                 activeBoxesWidth = activeBoxes[i][6]
                 activeBoxesHeight = activeBoxes[i][7]
                 # if item fits in a previous box
-                if activeBoxes[i][0] >= itemTotalVolume and activeBoxes[i][1] + itemTotalWeight <= MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
+                if activeBoxes[i][0] >= itemTotalVolume and activeBoxes[i][1] + itemTotalWeight < MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
                     activeBoxes[i][0] -= itemTotalVolume
                     activeBoxes[i][1] += itemTotalWeight
                     activeBoxesContent[i].append(item)
@@ -279,7 +279,7 @@ def distributeToBoxes(boxes, itemLines):
                     currentBoxTotalWeight = activeBoxTotalWeight
                     currentBoxWeight = activeBoxWeight
                     newBoxWeight = nextBox['weight'] - currentBoxWeight
-                    if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight <= MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
+                    if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight < MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
                         activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex, nextBox['length'], nextBox['width'], nextBox['height']])
                         activeBoxesContent.append([item] + activeBoxesContent[i])
                         # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
@@ -291,7 +291,7 @@ def distributeToBoxes(boxes, itemLines):
         # find a new box
         if not foundABox:
             for i in range(len(boxes)):
-                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] <= MAX_WEIGHT_PER_BOX and itemFitByDimension(boxes[i]['length'], boxes[i]['width'], boxes[i]['height'], item.length, item.width, item.height):
+                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] < MAX_WEIGHT_PER_BOX and itemFitByDimension(boxes[i]['length'], boxes[i]['width'], boxes[i]['height'], item.length, item.width, item.height):
                     activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight + boxes[i]['weight'], boxes[i]['weight'], boxes[i]['name'], i, boxes[i]['length'], boxes[i]['width'], boxes[i]['height']])
                     activeBoxesContent.append([item])
                     # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)]) # for debugging
