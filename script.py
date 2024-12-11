@@ -239,7 +239,10 @@ def distributeToBoxes(boxes, itemLines):
     # Sort boxes from lowest volume to highest volume
     boxes = sortBoxes(boxes)
 
-    activeBoxes = []
+    for b in boxes:
+        print(b)
+
+    activeBoxes = [] # [current remaining box volume, current box total weight, box weight, box name, box index, box length, box width, box height]
     activeBoxesContent = []
     itemsDoNotFit = []
     itemsShipAsIs = []
@@ -256,7 +259,7 @@ def distributeToBoxes(boxes, itemLines):
         # look at previous boxes
         if activeBoxes:
             for i in range(len(activeBoxes)):
-                activeBoxTotalVolume = activeBoxes[i][0]
+                activeBoxRemainingVolume = activeBoxes[i][0]
                 activeBoxTotalWeight = activeBoxes[i][1]
                 activeBoxWeight = activeBoxes[i][2]
                 activeBoxesLength = activeBoxes[i][5]
@@ -267,23 +270,21 @@ def distributeToBoxes(boxes, itemLines):
                     activeBoxes[i][0] -= itemTotalVolume
                     activeBoxes[i][1] += itemTotalWeight
                     activeBoxesContent[i].append(item)
-                    # activeBoxesContent[i].append('{}-{}'.format(item.sku, item.uomCode)) # for debugging
                     foundABox = True
                     break
                 # check if we can combine item(s) from previous box with current item in a bigger box
                 nextBoxIndex = activeBoxes[i][4] + 1
-                # while (nextBoxIndex < len(boxes) and volume_manipulation)
-                if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
+                currentBoxTotalVolume = boxes[activeBoxes[i][4]]['volume'] - activeBoxRemainingVolume
+                currentBoxTotalWeight = activeBoxTotalWeight
+                while currentBoxTotalVolume + itemTotalVolume > boxes[nextBoxIndex]['volume'] and nextBoxIndex < len(boxes) - 1:
+                    nextBoxIndex += 1
+                if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes) - 1:
                     nextBox = boxes[nextBoxIndex]
-                    currentBoxTotalVolume = activeBoxTotalVolume
-                    currentBoxTotalWeight = activeBoxTotalWeight
                     currentBoxWeight = activeBoxWeight
                     newBoxWeight = nextBox['weight'] - currentBoxWeight
-                    if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight < MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
+                    if (currentBoxTotalVolume + itemTotalVolume <= nextBox['volume']) and (currentBoxTotalWeight + itemTotalWeight + newBoxWeight < MAX_WEIGHT_PER_BOX) and (itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height)) and (not volumeIsBiggerByAtLeast(VOLUME_BIGGER_BY_THRESHOLD, nextBox['volume'], boxes[activeBoxes[i][4]]['volume'])):
                         activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex, nextBox['length'], nextBox['width'], nextBox['height']])
                         activeBoxesContent.append([item] + activeBoxesContent[i])
-                        # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
-                        #                              [i]) # for debugging
                         activeBoxes[i][0] = -1
                         activeBoxesContent[i] = []
                         foundABox = True
@@ -294,12 +295,18 @@ def distributeToBoxes(boxes, itemLines):
                 if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] < MAX_WEIGHT_PER_BOX and itemFitByDimension(boxes[i]['length'], boxes[i]['width'], boxes[i]['height'], item.length, item.width, item.height):
                     activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight + boxes[i]['weight'], boxes[i]['weight'], boxes[i]['name'], i, boxes[i]['length'], boxes[i]['width'], boxes[i]['height']])
                     activeBoxesContent.append([item])
-                    # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)]) # for debugging
                     foundABox = True
                     break
         # item could not find a box
         if not foundABox:
             itemsDoNotFit.append(item.sku)
+
+        print("***********************")
+        print(activeBoxes)
+        for c in activeBoxesContent:
+            print("box")
+            for i in c:
+                print(i)
 
     return activeBoxes, activeBoxesContent, itemsShipAsIs, itemsDoNotFit
 

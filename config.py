@@ -1,6 +1,6 @@
 from pathlib import Path
 
-APP_VERSION = '1.0.5'
+APP_VERSION = '1.0.6'
 
 ASSETS_BASE_DIR = 'S:/!Warehouse/Box Selector Master'
 # ASSETS_BASE_DIR = './'
@@ -13,3 +13,4 @@ USER_DOWNLOADS = str(Path.home() / "Downloads") + '/'
 MAX_WEIGHT_PER_BOX = 40 # 40 lbs
 BOX_DIMENSION_PADDING = 0.5 # 0.5 inch
 SHIP_CASE_AS_IS_WEIGHT_THRESHOLD = 20 # 20 lbs
+VOLUME_BIGGER_BY_THRESHOLD = 50 # 50%
