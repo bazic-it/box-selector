@@ -239,9 +239,6 @@ def distributeToBoxes(boxes, itemLines):
     # Sort boxes from lowest volume to highest volume
     boxes = sortBoxes(boxes)
 
-    # for b in boxes:
-    #     print(b)
-
     activeBoxes = [] # [current remaining box volume, current box total weight, box weight, box name, box index, box length, box width, box height]
     activeBoxesContent = []
     itemsDoNotFit = []
@@ -300,13 +297,6 @@ def distributeToBoxes(boxes, itemLines):
         # item could not find a box
         if not foundABox:
             itemsDoNotFit.append(item.sku)
-
-        # print("***********************")
-        # print(activeBoxes)
-        # for c in activeBoxesContent:
-        #     print("box")
-        #     for i in c:
-        #         print(i)
 
     return activeBoxes, activeBoxesContent, itemsShipAsIs, itemsDoNotFit
 
