@@ -2,8 +2,8 @@ from pathlib import Path
 
 APP_VERSION = '1.0.6'
 
-ASSETS_BASE_DIR = 'S:/!Warehouse/Box Selector Master'
-# ASSETS_BASE_DIR = './'
+# ASSETS_BASE_DIR = 'S:/!Warehouse/Box Selector Master'
+ASSETS_BASE_DIR = './'
 BOX_MASTER_FILENAME = 'boxes_master.csv'
 INVENTORY_MASTER_FILENAME = 'Item List with PICTURE (For Excel) - All Items.xlsx'
 # LOGS_FILENAME = 'logs.txt'

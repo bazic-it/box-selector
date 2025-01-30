@@ -6,25 +6,19 @@ import math
 from functools import cmp_to_key
 from utils import *
 from config import *
+from classes import *
+from packer_main import Packer, Bin, Item
 
-class ItemLine:
-    def __init__(self):
-        self.sku = None
-        self.itemDescription = None
-        self.uomCode = None
-        self.qty = None
-        self.pricePerPiece = None
-        self.totalLC = None
-        self.unitPrice = None
-        self.available = None
-        self.length = None
-        self.width = None
-        self.height = None
-        self.volume = None
-        self.weight = None
 
-    def __str__(self):
-        return 'sku: {}, UOM Code: {}, qty: {}, dimension: {} x {} x {}, volume: {}, weight: {}'.format(self.sku, self.uomCode, self.qty, self.length, self.width, self.height, self.volume, self.weight)
+def registerBoxesToPacker(packer, boxes):
+    for box in boxes:
+        bin = Bin(box.name, box.length, box.width, box.height, MAX_WEIGHT_PER_BOX)
+        packer.add_bin(bin)
+
+def registerItemsToPacker(packer, items):
+    for _item in items:
+        item = Item(_item.sku, _item.uomCode, _item.length, _item.width, _item.height, _item.weight)
+        packer.add_item(item)
 
 def sortOrders(a, b):
     if a[2] == 'CASE' and (b[2] == 'BOX' or b[2] == 'EA'):
@@ -121,18 +115,11 @@ def getBoxesMasterData(inputFilepath):
                 width = float(line[2]) - BOX_DIMENSION_PADDING
                 height = float(line[3]) - BOX_DIMENSION_PADDING
                 weight = float(line[4])
-                volume = cubicInchesToCubicFeet(length, width, height)
-                boxes.append({
-                        'name': line[0],
-                        'length': length,
-                        'width': width,
-                        'height': height,
-                        'volume': volume,
-                        'weight': weight
-                    })
+                box = Box(line[0], length, width, height, weight)
+                boxes.append(box)
                 row += 1
-    except:
-        print('*** Error: Failed to read input file for UOM Master. Please make sure filename is valid. ***')
+    except Exception as e:
+        print(f'*** Error: Failed to read input file for Boxes Master Data. Please make sure filename is valid. {e} ***')
         return {}, message
 
     return boxes, message
@@ -239,6 +226,9 @@ def distributeToBoxes(boxes, itemLines):
     # Sort boxes from lowest volume to highest volume
     boxes = sortBoxes(boxes)
 
+    # for b in boxes:
+    #     print(b)
+
     activeBoxes = [] # [current remaining box volume, current box total weight, box weight, box name, box index, box length, box width, box height]
     activeBoxesContent = []
     itemsDoNotFit = []
@@ -297,6 +287,13 @@ def distributeToBoxes(boxes, itemLines):
         # item could not find a box
         if not foundABox:
             itemsDoNotFit.append(item.sku)
+
+        print("***********************")
+        print(activeBoxes)
+        for c in activeBoxesContent:
+            print("box")
+            for i in c:
+                print(i)
 
     return activeBoxes, activeBoxesContent, itemsShipAsIs, itemsDoNotFit
 
@@ -360,33 +357,75 @@ def compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs):
 
     return results
 
-def displayResultsAsString(results):
+# def displayResultsAsString(results):
+#     texts = []
+#     count = 1
+
+#     for result in results:
+#         if result['type'] == 'outer_box':
+#             box = result
+#             contents = []
+#             for contentKey, contentValues in box['contents'].items():
+#                 contents.append('{}-{:<8}x{}'.format(contentValues['sku'], contentValues['uomCode'], contentValues['qty']))
+
+#             texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
+#             texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
+#             texts.append('Contents:\n{}'.format('\n'.join(contents)))
+#             texts.append(' ')
+#         elif result['type'] == 'as_is':
+#             texts.append('{}. As Is: {} ({}" x {}" x {}")'.format(count, result['name'], result['length'], result['width'], result['height']))
+#             texts.append('Weight: {} Lb'.format(math.ceil(result['weight'])))
+#             texts.append(' ')
+#         else:
+#             pass
+
+#         count += 1
+
+#     return texts
+
+def compileItemsInBox(items):
+    mapped = {}
+
+    for item in items:
+        key = item.name + "-" + item.uom
+        if key in mapped:
+            mapped[key]["qty"] += 1
+        else:
+            mapped[key] = {
+                "name": item.name,
+                "uom": item.uom,
+                "qty": 1,
+                "width": item.width,
+                "height": item.height,
+                "depth": item.depth
+            }
+
+    return mapped
+
+def displayResultsAsString(boxes, itemsWithoutOuterBox):
     texts = []
     count = 1
 
-    for result in results:
-        if result['type'] == 'outer_box':
-            box = result
-            contents = []
-            for contentKey, contentValues in box['contents'].items():
-                contents.append('{}-{:<8}x{}'.format(contentValues['sku'], contentValues['uomCode'], contentValues['qty']))
+    for box in boxes:
+        if box.items:
+            compiledItems = compileItemsInBox(box.items)
+            texts.append('{}. {}    ({}" x {}" x {}")'.format(count, box.name, float(box.width) + BOX_DIMENSION_PADDING, float(box.height) + BOX_DIMENSION_PADDING, float(box.depth) + BOX_DIMENSION_PADDING))
+            texts.append('    Volume: {} / {}   Weight: {} Lbs'.format(box.get_filled_volume(), box.get_volume(), box.current_weight))
+            texts.append('    Content:')
+            for _, item in compiledItems.items():
+                texts.append('    {}x   {} - {} ({}" x {}" x {}")'.format(item["qty"], item["name"], item["uom"], item["width"], item["height"], item["depth"]))
+            texts.append('')
+            count += 1
 
-            texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
-            texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
-            texts.append('Contents:\n{}'.format('\n'.join(contents)))
-            texts.append(' ')
-        elif result['type'] == 'as_is':
-            texts.append('{}. As Is: {} ({}" x {}" x {}")'.format(count, result['name'], result['length'], result['width'], result['height']))
-            texts.append('Weight: {} Lb'.format(math.ceil(result['weight'])))
-            texts.append(' ')
-        else:
-            pass
-
-        count += 1
+    if itemsWithoutOuterBox:
+        texts.append('Ship As Is:')
+        for item in itemsWithoutOuterBox:
+            texts.append('    {} - {} ({}" x {}" x {}")'.format(item.name, item.uom, item.width, item.height, item.depth))
 
     return texts
 
 def distribute(filepath):
+    packer = Packer()
     success = True
 
     salesQuotationFilepath = validateInputFilename(filepath)
@@ -395,20 +434,40 @@ def distribute(filepath):
     boxesMaster, boxMsg = getBoxesMasterData(getBoxMasterFilepath())
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
-
     splittedItemLines = splitItem(itemLines)
+
+    registerItemsToPacker(packer, splittedItemLines)
+    registerBoxesToPacker(packer, boxesMaster)
+
+    leftoverItems = packer.pack(bins_bigger_first=False, items_bigger_first=True, distribute_items=True, number_of_decimals=2)
+
+    # for b in packer.bins:
+    #     print(":::::::::::", b.string())
+
+    #     print("FITTED ITEMS:")
+    #     for item in b.items:
+    #         print("====> ", item.string())
+
+    #     print("UNFITTED ITEMS:")
+    #     for item in b.unfitted_items:
+    #         print("====> ", item.string())
+
+    #     print("***************************************************")
+    #     print("***************************************************")
+
 
     # print("Items List:")
     # for item in splittedItemLines:
     #     print(item)
 
-    boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
+    # boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
 
-    results = compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs)
+    # results = compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs)
+    results = displayResultsAsString(packer.filled_bins, leftoverItems)
 
     return {
         'success': success,
-        'results': displayResultsAsString(results)
+        'results': results
     }
 
 def validateInputFilename(filename):
