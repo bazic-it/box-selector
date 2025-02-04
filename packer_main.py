@@ -67,6 +67,7 @@ class Bin:
         self.items = []
         self.unfitted_items = []
         self.number_of_decimals = DEFAULT_NUMBER_OF_DECIMALS
+        self.index = -1
 
     def format_numbers(self, number_of_decimals):
         self.width = set_to_decimal(self.width, number_of_decimals)
@@ -212,7 +213,7 @@ class Packer:
             response = bin.put_item(item, START_POSITION)
 
             if not response:
-                bin.unfitted_items.append(item)
+                # bin.unfitted_items.append(item)
                 return fitted
             else:
                 fitted = True
@@ -273,11 +274,11 @@ class Packer:
             key=lambda item: item.get_volume(), reverse=items_bigger_first
         )
 
-        for bin in self.bins:
-            print(bin.string())
+        # for bin in self.bins:
+        #     print(bin.string())
 
         # New algorithm for packing efficiency
-        for item in self.items:
+        for idx, item in enumerate(self.items):
             itemIsFitted = False
 
             # check if item should be shipped as is
@@ -287,6 +288,7 @@ class Packer:
 
             # try to fit item in a filled bin
             for filled_bin in self.filled_bins:
+                canFitToBiggerBin = False
                 # if filled_bin is not an active bin
                 if not filled_bin.items:
                     continue
@@ -294,35 +296,50 @@ class Packer:
                 # if item fits in current filled bin
                 if self.pack_to_bin(filled_bin, item):
                     itemIsFitted = True
-            
+                    break
+
                 # check if we can combine item(s) from previous box with current item in a bigger box
                 nextBiggerBin = None
-                nextBinIndex = self.bins.index(filled_bin) + 1
-                while (nextBinIndex < (len(self.bins) - 1) and volumeIsBiggerByAtLeast(VOLUME_BIGGER_BY_THRESHOLD, self.bins[nextBinIndex].get_volume(), filled_bin.get_volume())):
-                    canFitToBiggerBox = True
+                nextBinIndex = filled_bin.index + 1
+                while (not itemIsFitted and nextBinIndex < len(self.bins)):
                     if nextBinIndex < len(self.bins):
                         nextBiggerBin = self.bins[nextBinIndex]
                     
                     if nextBiggerBin:
-                        for _item in filled_bin.items:
-                            if not self.pack_to_bin(nextBiggerBin, _item):
-                                canFitToBiggerBox = False
-                                break
-
-                        if canFitToBiggerBox and self.pack_to_bin(nextBiggerBin, item):
-                            self.filled_bins.append(nextBiggerBin)
-                            filled_bin.items = [] # deactivate filled_bin
-                            itemIsFitted = True
+                        # check if current item is the last item, and the filled bin volume combined with the smallest box volume, is smaller than the next bigger bin volume.
+                        if (idx == len(self.items) - 1) and (filled_bin.get_volume() + self.bins[0].get_volume() < nextBiggerBin.get_volume()):
+                            break
+                            
+                    for _item in filled_bin.items:
+                        if not self.pack_to_bin(nextBiggerBin, _item):
+                            nextBiggerBin.items = []
                             break
 
+                    if self.pack_to_bin(nextBiggerBin, item):
+                        biggerBin = Bin(nextBiggerBin.name, nextBiggerBin.width, nextBiggerBin.height, nextBiggerBin.depth, nextBiggerBin.max_weight)
+                        biggerBin.items = nextBiggerBin.items
+                        biggerBin.index = self.bins.index(nextBiggerBin)
+                        self.filled_bins.append(biggerBin)
+                        nextBiggerBin.items = []
+                        filled_bin.items = [] # deactivate filled_bin
+                        itemIsFitted = True
+                        canFitToBiggerBin = True
+
                     nextBinIndex += 1
+
+                if canFitToBiggerBin:
+                    break
 
             # if no filled bins or item does not fit in any filled bins, put item in an empty bin
             if not itemIsFitted:
                 for bin in self.bins:
                     if self.pack_to_bin(bin, item):
                         itemIsFitted = True
-                        self.filled_bins.append(bin)
+                        filledBin = Bin(bin.name, bin.width, bin.height, bin.depth, bin.max_weight)
+                        filledBin.items = bin.items
+                        filledBin.index = self.bins.index(bin)
+                        bin.items = []
+                        self.filled_bins.append(filledBin)
                         break
             
             if not itemIsFitted:

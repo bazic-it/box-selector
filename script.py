@@ -410,17 +410,17 @@ def displayResultsAsString(boxes, itemsWithoutOuterBox):
         if box.items:
             compiledItems = compileItemsInBox(box.items)
             texts.append('{}. {}    ({}" x {}" x {}")'.format(count, box.name, float(box.width) + BOX_DIMENSION_PADDING, float(box.height) + BOX_DIMENSION_PADDING, float(box.depth) + BOX_DIMENSION_PADDING))
-            texts.append('    Volume: {} / {}   Weight: {} Lbs'.format(box.get_filled_volume(), box.get_volume(), box.current_weight))
+            texts.append('    Volume: {:.2f} / {:.2f} in³  Weight: {} Lbs'.format(box.get_filled_volume(), box.get_volume(), box.current_weight if box.current_weight > 0 else 1))
             texts.append('    Content:')
             for _, item in compiledItems.items():
-                texts.append('    {}x   {} - {} ({}" x {}" x {}")'.format(item["qty"], item["name"], item["uom"], item["width"], item["height"], item["depth"]))
+                texts.append('      {}x   {} - {} ({}" x {}" x {}")'.format(item["qty"], item["name"], item["uom"], item["width"], item["height"], item["depth"]))
             texts.append('')
             count += 1
 
     if itemsWithoutOuterBox:
         texts.append('Ship As Is:')
         for item in itemsWithoutOuterBox:
-            texts.append('    {} - {} ({}" x {}" x {}")'.format(item.name, item.uom, item.width, item.height, item.depth))
+            texts.append('      {} - {} ({}" x {}" x {}")'.format(item.name, item.uom, item.width, item.height, item.depth))
 
     return texts
 
@@ -441,28 +441,6 @@ def distribute(filepath):
 
     leftoverItems = packer.pack(bins_bigger_first=False, items_bigger_first=True, distribute_items=True, number_of_decimals=2)
 
-    # for b in packer.bins:
-    #     print(":::::::::::", b.string())
-
-    #     print("FITTED ITEMS:")
-    #     for item in b.items:
-    #         print("====> ", item.string())
-
-    #     print("UNFITTED ITEMS:")
-    #     for item in b.unfitted_items:
-    #         print("====> ", item.string())
-
-    #     print("***************************************************")
-    #     print("***************************************************")
-
-
-    # print("Items List:")
-    # for item in splittedItemLines:
-    #     print(item)
-
-    # boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
-
-    # results = compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs)
     results = displayResultsAsString(packer.filled_bins, leftoverItems)
 
     return {
