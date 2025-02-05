@@ -9,7 +9,6 @@ from config import *
 from classes import *
 from packer_main import Packer, Bin, Item
 
-
 def registerBoxesToPacker(packer, boxes):
     for box in boxes:
         bin = Bin(box.name, box.length, box.width, box.height, MAX_WEIGHT_PER_BOX)
@@ -356,32 +355,6 @@ def compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs):
             })
 
     return results
-
-# def displayResultsAsString(results):
-#     texts = []
-#     count = 1
-
-#     for result in results:
-#         if result['type'] == 'outer_box':
-#             box = result
-#             contents = []
-#             for contentKey, contentValues in box['contents'].items():
-#                 contents.append('{}-{:<8}x{}'.format(contentValues['sku'], contentValues['uomCode'], contentValues['qty']))
-
-#             texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
-#             texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
-#             texts.append('Contents:\n{}'.format('\n'.join(contents)))
-#             texts.append(' ')
-#         elif result['type'] == 'as_is':
-#             texts.append('{}. As Is: {} ({}" x {}" x {}")'.format(count, result['name'], result['length'], result['width'], result['height']))
-#             texts.append('Weight: {} Lb'.format(math.ceil(result['weight'])))
-#             texts.append(' ')
-#         else:
-#             pass
-
-#         count += 1
-
-#     return texts
 
 def compileItemsInBox(items):
     mapped = {}
