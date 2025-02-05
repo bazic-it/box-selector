@@ -23,3 +23,7 @@ def getBoxMasterFilepath():
 
 def getInventoryMasterFilepath():
     return os.path.join(ASSETS_BASE_DIR, INVENTORY_MASTER_FILENAME)
+
+def volumeIsBiggerByAtLeast(percentThreshold, biggerVolume, smallerVolume):
+    biggerPercentage = (abs(biggerVolume - smallerVolume) / smallerVolume) * 100
+    return biggerPercentage > percentThreshold

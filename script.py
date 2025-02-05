@@ -6,25 +6,18 @@ import math
 from functools import cmp_to_key
 from utils import *
 from config import *
+from classes import *
+from packer_main import Packer, Bin, Item
 
-class ItemLine:
-    def __init__(self):
-        self.sku = None
-        self.itemDescription = None
-        self.uomCode = None
-        self.qty = None
-        self.pricePerPiece = None
-        self.totalLC = None
-        self.unitPrice = None
-        self.available = None
-        self.length = None
-        self.width = None
-        self.height = None
-        self.volume = None
-        self.weight = None
+def registerBoxesToPacker(packer, boxes):
+    for box in boxes:
+        bin = Bin(box.name, box.length, box.width, box.height, MAX_WEIGHT_PER_BOX)
+        packer.add_bin(bin)
 
-    def __str__(self):
-        return 'sku: {}, UOM Code: {}, qty: {}, dimension: {} x {} x {}, volume: {}, weight: {}'.format(self.sku, self.uomCode, self.qty, self.length, self.width, self.height, self.volume, self.weight)
+def registerItemsToPacker(packer, items):
+    for _item in items:
+        item = Item(_item.sku, _item.uomCode, _item.length, _item.width, _item.height, _item.weight)
+        packer.add_item(item)
 
 def sortOrders(a, b):
     if a[2] == 'CASE' and (b[2] == 'BOX' or b[2] == 'EA'):
@@ -121,18 +114,11 @@ def getBoxesMasterData(inputFilepath):
                 width = float(line[2]) - BOX_DIMENSION_PADDING
                 height = float(line[3]) - BOX_DIMENSION_PADDING
                 weight = float(line[4])
-                volume = cubicInchesToCubicFeet(length, width, height)
-                boxes.append({
-                        'name': line[0],
-                        'length': length,
-                        'width': width,
-                        'height': height,
-                        'volume': volume,
-                        'weight': weight
-                    })
+                box = Box(line[0], length, width, height, weight)
+                boxes.append(box)
                 row += 1
-    except:
-        print('*** Error: Failed to read input file for UOM Master. Please make sure filename is valid. ***')
+    except Exception as e:
+        print(f'*** Error: Failed to read input file for Boxes Master Data. Please make sure filename is valid. {e} ***')
         return {}, message
 
     return boxes, message
@@ -239,7 +225,10 @@ def distributeToBoxes(boxes, itemLines):
     # Sort boxes from lowest volume to highest volume
     boxes = sortBoxes(boxes)
 
-    activeBoxes = []
+    # for b in boxes:
+    #     print(b)
+
+    activeBoxes = [] # [current remaining box volume, current box total weight, box weight, box name, box index, box length, box width, box height]
     activeBoxesContent = []
     itemsDoNotFit = []
     itemsShipAsIs = []
@@ -256,34 +245,32 @@ def distributeToBoxes(boxes, itemLines):
         # look at previous boxes
         if activeBoxes:
             for i in range(len(activeBoxes)):
-                activeBoxTotalVolume = activeBoxes[i][0]
+                activeBoxRemainingVolume = activeBoxes[i][0]
                 activeBoxTotalWeight = activeBoxes[i][1]
                 activeBoxWeight = activeBoxes[i][2]
                 activeBoxesLength = activeBoxes[i][5]
                 activeBoxesWidth = activeBoxes[i][6]
                 activeBoxesHeight = activeBoxes[i][7]
                 # if item fits in a previous box
-                if activeBoxes[i][0] >= itemTotalVolume and activeBoxes[i][1] + itemTotalWeight <= MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
+                if activeBoxes[i][0] >= itemTotalVolume and activeBoxes[i][1] + itemTotalWeight < MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
                     activeBoxes[i][0] -= itemTotalVolume
                     activeBoxes[i][1] += itemTotalWeight
                     activeBoxesContent[i].append(item)
-                    # activeBoxesContent[i].append('{}-{}'.format(item.sku, item.uomCode)) # for debugging
                     foundABox = True
                     break
                 # check if we can combine item(s) from previous box with current item in a bigger box
                 nextBoxIndex = activeBoxes[i][4] + 1
-                # while (nextBoxIndex < len(boxes) and volume_manipulation)
-                if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes):
+                currentBoxTotalVolume = boxes[activeBoxes[i][4]]['volume'] - activeBoxRemainingVolume
+                currentBoxTotalWeight = activeBoxTotalWeight
+                while currentBoxTotalVolume + itemTotalVolume > boxes[nextBoxIndex]['volume'] and nextBoxIndex < len(boxes) - 1:
+                    nextBoxIndex += 1
+                if activeBoxes[i][0] != -1 and nextBoxIndex >= 0 and nextBoxIndex < len(boxes) - 1:
                     nextBox = boxes[nextBoxIndex]
-                    currentBoxTotalVolume = activeBoxTotalVolume
-                    currentBoxTotalWeight = activeBoxTotalWeight
                     currentBoxWeight = activeBoxWeight
                     newBoxWeight = nextBox['weight'] - currentBoxWeight
-                    if currentBoxTotalVolume + itemTotalVolume <= nextBox['volume'] and currentBoxTotalWeight + itemTotalWeight + newBoxWeight <= MAX_WEIGHT_PER_BOX and itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height):
+                    if (currentBoxTotalVolume + itemTotalVolume <= nextBox['volume']) and (currentBoxTotalWeight + itemTotalWeight + newBoxWeight < MAX_WEIGHT_PER_BOX) and (itemFitByDimension(activeBoxesLength, activeBoxesWidth, activeBoxesHeight, item.length, item.width, item.height)) and (not volumeIsBiggerByAtLeast(VOLUME_BIGGER_BY_THRESHOLD, nextBox['volume'], boxes[activeBoxes[i][4]]['volume'])):
                         activeBoxes.append([nextBox['volume'] - (currentBoxTotalVolume + itemTotalVolume), currentBoxTotalWeight + itemTotalWeight + newBoxWeight, nextBox['weight'], nextBox['name'], nextBoxIndex, nextBox['length'], nextBox['width'], nextBox['height']])
                         activeBoxesContent.append([item] + activeBoxesContent[i])
-                        # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)] + activeBoxesContent
-                        #                              [i]) # for debugging
                         activeBoxes[i][0] = -1
                         activeBoxesContent[i] = []
                         foundABox = True
@@ -291,15 +278,21 @@ def distributeToBoxes(boxes, itemLines):
         # find a new box
         if not foundABox:
             for i in range(len(boxes)):
-                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] <= MAX_WEIGHT_PER_BOX and itemFitByDimension(boxes[i]['length'], boxes[i]['width'], boxes[i]['height'], item.length, item.width, item.height):
+                if itemTotalVolume <= boxes[i]['volume'] and itemTotalWeight + boxes[i]['weight'] < MAX_WEIGHT_PER_BOX and itemFitByDimension(boxes[i]['length'], boxes[i]['width'], boxes[i]['height'], item.length, item.width, item.height):
                     activeBoxes.append([boxes[i]['volume'] - itemTotalVolume, itemTotalWeight + boxes[i]['weight'], boxes[i]['weight'], boxes[i]['name'], i, boxes[i]['length'], boxes[i]['width'], boxes[i]['height']])
                     activeBoxesContent.append([item])
-                    # activeBoxesContent.append(['{}-{}'.format(item.sku, item.uomCode)]) # for debugging
                     foundABox = True
                     break
         # item could not find a box
         if not foundABox:
             itemsDoNotFit.append(item.sku)
+
+        print("***********************")
+        print(activeBoxes)
+        for c in activeBoxesContent:
+            print("box")
+            for i in c:
+                print(i)
 
     return activeBoxes, activeBoxesContent, itemsShipAsIs, itemsDoNotFit
 
@@ -363,33 +356,49 @@ def compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs):
 
     return results
 
-def displayResultsAsString(results):
+def compileItemsInBox(items):
+    mapped = {}
+
+    for item in items:
+        key = item.name + "-" + item.uom
+        if key in mapped:
+            mapped[key]["qty"] += 1
+        else:
+            mapped[key] = {
+                "name": item.name,
+                "uom": item.uom,
+                "qty": 1,
+                "width": item.width,
+                "height": item.height,
+                "depth": item.depth
+            }
+
+    return mapped
+
+def displayResultsAsString(boxes, itemsWithoutOuterBox):
     texts = []
     count = 1
 
-    for result in results:
-        if result['type'] == 'outer_box':
-            box = result
-            contents = []
-            for contentKey, contentValues in box['contents'].items():
-                contents.append('{}-{:<8}x{}'.format(contentValues['sku'], contentValues['uomCode'], contentValues['qty']))
+    for box in boxes:
+        if box.items:
+            compiledItems = compileItemsInBox(box.items)
+            texts.append('{}. {}    ({}" x {}" x {}")'.format(count, box.name, float(box.width) + BOX_DIMENSION_PADDING, float(box.height) + BOX_DIMENSION_PADDING, float(box.depth) + BOX_DIMENSION_PADDING))
+            texts.append('    Volume: {:.2f} / {:.2f} in³  Weight: {} Lbs'.format(box.get_filled_volume(), box.get_volume(), box.current_weight if box.current_weight > 0 else 1))
+            texts.append('    Content:')
+            for _, item in compiledItems.items():
+                texts.append('      {}x   {} - {} ({}" x {}" x {}")'.format(item["qty"], item["name"], item["uom"], item["width"], item["height"], item["depth"]))
+            texts.append('')
+            count += 1
 
-            texts.append('{}. Box: {} ({}" x {}" x {}")'.format(count, box['name'], box['length'] + BOX_DIMENSION_PADDING, box['width'] + BOX_DIMENSION_PADDING, box['height'] + BOX_DIMENSION_PADDING))
-            texts.append('Weight: {} Lb'.format(math.ceil(box['weight'])))
-            texts.append('Contents:\n{}'.format('\n'.join(contents)))
-            texts.append(' ')
-        elif result['type'] == 'as_is':
-            texts.append('{}. As Is: {} ({}" x {}" x {}")'.format(count, result['name'], result['length'], result['width'], result['height']))
-            texts.append('Weight: {} Lb'.format(math.ceil(result['weight'])))
-            texts.append(' ')
-        else:
-            pass
-
-        count += 1
+    if itemsWithoutOuterBox:
+        texts.append('Ship As Is:')
+        for item in itemsWithoutOuterBox:
+            texts.append('      {} - {} ({}" x {}" x {}")'.format(item.name, item.uom, item.width, item.height, item.depth))
 
     return texts
 
 def distribute(filepath):
+    packer = Packer()
     success = True
 
     salesQuotationFilepath = validateInputFilename(filepath)
@@ -398,20 +407,18 @@ def distribute(filepath):
     boxesMaster, boxMsg = getBoxesMasterData(getBoxMasterFilepath())
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
-
     splittedItemLines = splitItem(itemLines)
 
-    # print("Items List:")
-    # for item in splittedItemLines:
-    #     print(item)
+    registerItemsToPacker(packer, splittedItemLines)
+    registerBoxesToPacker(packer, boxesMaster)
 
-    boxes, boxesContents, itemsShipAsIs, itemsDoNotFit = distributeToBoxes(boxesMaster, splittedItemLines)
+    leftoverItems = packer.pack(bins_bigger_first=False, items_bigger_first=True, distribute_items=True, number_of_decimals=2)
 
-    results = compileResults(boxesMaster, boxes, boxesContents, itemsShipAsIs)
+    results = displayResultsAsString(packer.filled_bins, leftoverItems)
 
     return {
         'success': success,
-        'results': displayResultsAsString(results)
+        'results': results
     }
 
 def validateInputFilename(filename):
