@@ -4,7 +4,7 @@ from tkinter import messagebox
 from script import *
 
 INSTRUCTION = """
-
+    \nPlease update available boxes to the boxes master data file. This program is just giving a suggestion based on the set algorithm, it does not guarantee to give the most efficient result all the time.
 """
 
 class App:
@@ -12,7 +12,7 @@ class App:
         self.root = tk.Tk()
         self.root.iconbitmap("./assets/icon/icon.ico")
         self.root.title("Box Picker - {}".format(APP_VERSION))
-        self.root.geometry("350x550")
+        self.root.geometry("450x550")
 
         self.frame1 = tk.Frame(self.root)
         self.frame1.pack()
@@ -66,7 +66,7 @@ class App:
             response = distribute(inputFilename)
 
             if response["success"] is not None and not response["success"]:
-                self.showStatusMessage("Error", response["errorMessage"])
+                self.showStatusMessage("Error", response["message"])
 
             if response['results']:
                 text = '\n'.join(response['results'])

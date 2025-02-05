@@ -56,6 +56,7 @@ def getInventoryMasterData(inputFilepath):
                             mapped[itemNumber][headerMap[c]] = data
     except Exception as e:
         print('*** Error: Failed to read input file for Inventory Master: {} ***'.format(e))
+        message = "Please check the input file for Inventory Master Data.\n1. Make sure the file exists in the correct location with valid filename.\n2. Make sure all entries are valid."
         return {}, message
     
     return mapped, message
@@ -88,6 +89,7 @@ def getSalesQuotationItemsFromInputfile(filepath):
 
     except Exception as e:
         print('*** Error: Failed to read input file for Sales Quotation: {} ***'.format(e))
+        message = "Please check input file for Sales Quotation."
         return {}, message
     
     return items, message
@@ -115,6 +117,7 @@ def getBoxesMasterData(inputFilepath):
                 row += 1
     except Exception as e:
         print(f'*** Error: Failed to read input file for Boxes Master Data. Please make sure filename is valid. {e} ***')
+        message = "Please check the input file for Boxes Master Data.\n1. Make sure the file exists in the correct location with valid filename.\n2. Make sure all entries are valid."
         return {}, message
 
     return boxes, message
@@ -267,6 +270,27 @@ def distribute(filepath):
     items, itemsMsg = getSalesQuotationItemsFromInputfile(salesQuotationFilepath)
     itemLines, itemsWithNoInfo = combineDetailsForEachItem(inventoryMaster, items)
     splittedItemLines = splitItem(itemLines)
+
+    if not inventoryMaster:
+        return {
+            'success': False,
+            'results': [],
+            'message': invMsg
+        }
+
+    if not boxesMaster:
+        return {
+            'success': False,
+            'results': [],
+            'message': boxMsg
+        }
+    
+    if not items:
+        return {
+            'success': False,
+            'results': [],
+            'message': itemsMsg
+        }
 
     registerItemsToPacker(packer, splittedItemLines)
     registerBoxesToPacker(packer, boxesMaster)
